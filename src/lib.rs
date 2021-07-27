@@ -67,17 +67,17 @@ extern crate embedded_hal as hal;
 
 use bit_reverse::ParallelReverse;
 use core::fmt;
-use hal::blocking::spi;
-use hal::digital::OutputPin;
+use crate::hal::blocking::spi;
+use crate::hal::digital::OutputPin;
 
-use mouse::Mouse;
-use classic::{Classic, GamepadButtons};
-use dualshock::{DualShock, DualShock2};
-use negcon::NegCon;
-use jogcon::JogCon;
-use guncon::GunCon;
-use guitarhero::GuitarHero;
-use baton::Baton;
+use crate::mouse::Mouse;
+use crate::classic::{Classic, GamepadButtons};
+use crate::dualshock::{DualShock, DualShock2};
+use crate::negcon::NegCon;
+use crate::jogcon::JogCon;
+use crate::guncon::GunCon;
+use crate::guitarhero::GuitarHero;
+use crate::baton::Baton;
 
 /// The maximum length of a message from a controller
 const MESSAGE_MAX_LENGTH: usize = 32;
@@ -204,7 +204,7 @@ pub trait PollCommand {
     /// Re-write the provided slice starting from index 0. This command
     /// is called by read_input() which will provide a sub-slice of the
     /// controller's command bytes.
-    fn set_command(&self, &mut [u8]);
+    fn set_command(&self, _: &mut [u8]);
 }
 
 /// Many controllers have the same set of buttons (Square, Circle, L3, R1, etc).
@@ -416,7 +416,7 @@ where
         Ok(config)
     }
 
-    fn read_port(&mut self, command: Option<&PollCommand>) -> Result<[u8; MESSAGE_MAX_LENGTH], Error<E>> {
+    fn read_port(&mut self, command: Option<&dyn PollCommand>) -> Result<[u8; MESSAGE_MAX_LENGTH], Error<E>> {
         let mut buffer = [0u8; MESSAGE_MAX_LENGTH];
         let mut data = [0u8; MESSAGE_MAX_LENGTH];
 
@@ -448,7 +448,7 @@ where
     /// Get the raw data from polling for a controller. You can use this to cooerce the data into
     /// some controller that can't be safely identified by `read_input`, but you should rely on that
     /// function if you can.
-    pub fn read_raw(&mut self, command: Option<&PollCommand>) -> Result<ControllerData, Error<E>> {
+    pub fn read_raw(&mut self, command: Option<&dyn PollCommand>) -> Result<ControllerData, Error<E>> {
         let mut buffer = [0u8; MESSAGE_MAX_LENGTH];
         let data = self.read_port(command)?;
 
@@ -463,7 +463,7 @@ where
 
     /// Ask the controller for input states. Different contoller types will be returned automatically
     /// for you. If you'd like to cooerce a controller yourself, use `read_raw`.
-    pub fn read_input(&mut self, command: Option<&PollCommand>) -> Result<Device, Error<E>> {
+    pub fn read_input(&mut self, command: Option<&dyn PollCommand>) -> Result<Device, Error<E>> {
         let mut buffer = [0u8; MESSAGE_MAX_LENGTH];
         let data = self.read_port(command)?;
 
