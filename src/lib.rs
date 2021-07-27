@@ -66,9 +66,8 @@ extern crate byteorder;
 extern crate embedded_hal as hal;
 
 use bit_reverse::ParallelReverse;
-use core::fmt;
 use crate::hal::blocking::spi;
-use crate::hal::digital::OutputPin;
+use crate::hal::digital::v2::OutputPin;
 
 use crate::mouse::Mouse;
 use crate::classic::{Classic, GamepadButtons};
@@ -178,26 +177,24 @@ pub enum MultitapPort {
 }
 
 /// Errors that can arrise from trying to communicate with the controller
-pub enum Error<E> {
+#[derive(Debug)]
+pub enum Error<E, EP> {
     /// Late collision
     LateCollision,
     /// Something responded badly
     BadResponse,
     /// SPI error
     Spi(E),
+    /// Pin error
+    Pin(EP),
 }
 
-impl<E> From<E> for Error<E> {
+impl<E, EP> From<E> for Error<E, EP> {
     fn from(e: E) -> Self {
         Error::Spi(e)
     }
 }
 
-impl<E> fmt::Debug for Error<E> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Error")
-    }
-}
 
 /// Commands to send off with a poll request.
 pub trait PollCommand {
@@ -293,17 +290,17 @@ where
 
     /// Create a new device to talk over the PlayStation's controller
     /// port
-    pub fn new(spi: SPI, mut select: Option<CS>) -> Self {
+    pub fn new(spi: SPI, mut select: Option<CS>) -> Result<Self, Error<E, CS::Error>> {
         // If a select pin was provided, disable the controller for now
         if let Some(ref mut x) = select {
-            x.set_high();
+            x.set_high().map_err(Error::Pin)?
         }
 
-        Self {
+        Ok(Self {
             dev: spi,
             select,
             multitap_port: MultitapPort::A,
-        }
+        })
     }
 
     fn flip(bytes: &mut [u8]) {
@@ -320,7 +317,7 @@ where
     }
 
     /// Sends commands to the underlying hardware and provides responses
-    pub fn send_command(&mut self, command: &[u8], result: &mut [u8]) -> Result<(), E> {
+    pub fn send_command(&mut self, command: &[u8], result: &mut [u8]) -> Result<(), Error<E, CS::Error>> {
         // Pack in bytes for the command we'll be sending
         result[..command.len()].copy_from_slice(command);
         result[0] = self.multitap_port.clone() as u8;
@@ -330,13 +327,13 @@ where
         Self::flip(result);
 
         if let Some(ref mut x) = self.select {
-            x.set_low();
+            x.set_low().map_err(Error::Pin)?;
         }
 
         self.dev.transfer(result)?;
 
         if let Some(ref mut x) = self.select {
-            x.set_high();
+            x.set_high().map_err(Error::Pin)?;
         }
 
         Self::flip(result);
@@ -346,7 +343,7 @@ where
 
     /// Configure the controller to set it to DualShock2 mode. This will also
     /// enable analog mode on DualShock1 controllers.
-    pub fn enable_pressure(&mut self) -> Result<(), E> {
+    pub fn enable_pressure(&mut self) -> Result<(), Error<E, CS::Error>> {
         // TODO: Redefine this to allow input parameters. Right now they're are hard coded
         // TODO: Detect and return actual protocol errors
 
@@ -371,7 +368,7 @@ where
     /// JogCon will go to sleep until buttons are pressed. If no polling is
     /// done for 10 seconds, it will drop out of this mode and revert to
     /// the standard Controller mode
-    pub fn enable_jogcon(&mut self) -> Result<(), E> {
+    pub fn enable_jogcon(&mut self) -> Result<(), Error<E, CS::Error>> {
         let mut buffer = [0u8; MESSAGE_MAX_LENGTH];
 
         // Wake up the controller if needed
@@ -387,7 +384,7 @@ where
 
     /// Read various parameters from the controller including its current
     /// status.
-    pub fn read_config(&mut self) -> Result<ControllerConfiguration, E> {
+    pub fn read_config(&mut self) -> Result<ControllerConfiguration, Error<E, CS::Error>> {
         let mut config: ControllerConfiguration = Default::default();
         let mut buffer = [0u8; MESSAGE_MAX_LENGTH];
 
@@ -416,7 +413,7 @@ where
         Ok(config)
     }
 
-    fn read_port(&mut self, command: Option<&dyn PollCommand>) -> Result<[u8; MESSAGE_MAX_LENGTH], Error<E>> {
+    fn read_port(&mut self, command: Option<&dyn PollCommand>) -> Result<[u8; MESSAGE_MAX_LENGTH], Error<E, CS::Error>> {
         let mut buffer = [0u8; MESSAGE_MAX_LENGTH];
         let mut data = [0u8; MESSAGE_MAX_LENGTH];
 
@@ -448,7 +445,7 @@ where
     /// Get the raw data from polling for a controller. You can use this to cooerce the data into
     /// some controller that can't be safely identified by `read_input`, but you should rely on that
     /// function if you can.
-    pub fn read_raw(&mut self, command: Option<&dyn PollCommand>) -> Result<ControllerData, Error<E>> {
+    pub fn read_raw(&mut self, command: Option<&dyn PollCommand>) -> Result<ControllerData, Error<E, CS::Error>> {
         let mut buffer = [0u8; MESSAGE_MAX_LENGTH];
         let data = self.read_port(command)?;
 
@@ -463,7 +460,7 @@ where
 
     /// Ask the controller for input states. Different contoller types will be returned automatically
     /// for you. If you'd like to cooerce a controller yourself, use `read_raw`.
-    pub fn read_input(&mut self, command: Option<&dyn PollCommand>) -> Result<Device, Error<E>> {
+    pub fn read_input(&mut self, command: Option<&dyn PollCommand>) -> Result<Device, Error<E, CS::Error>> {
         let mut buffer = [0u8; MESSAGE_MAX_LENGTH];
         let data = self.read_port(command)?;
 
