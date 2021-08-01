@@ -240,6 +240,7 @@ pub struct ControllerConfiguration {
 /// Guitar Hero controller reports in every way that it is a DualShock 1 controller.
 /// Other devices, like the DVD remote don't even support escape mode so this
 /// is the best I can do until we find a better way to get creative.
+#[derive(Debug)]
 pub enum Device {
     /// If pulling the device type didn't work
     None,

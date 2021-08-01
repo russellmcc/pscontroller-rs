@@ -17,7 +17,7 @@ use super::{
 
 /// What we want the JogCon's wheel to do after we
 /// poll it
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum JogControl {
     /// Stop the motor
     Stop = 0x00,
@@ -48,7 +48,7 @@ pub enum JogState {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 /// Represents the Namco JogCon controller
 pub struct JogCon {
     // TODO: Implement an endian-safe accessor for jog_position

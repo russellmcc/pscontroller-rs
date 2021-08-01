@@ -6,7 +6,7 @@
 
 /// The two buttons found on the mouse
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct MouseButtons {
     data: u16
 }
@@ -27,7 +27,7 @@ impl MouseButtons {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 /// Represents the classic Controller
 pub struct Mouse {
     /// Standard buttons
